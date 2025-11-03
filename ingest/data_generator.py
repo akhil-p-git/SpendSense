@@ -220,6 +220,7 @@ def generate_liabilities(accounts_df):
 
             liabilities.append({
                 'account_id': account['account_id'],
+                'user_id': account['user_id'],
                 'type': 'credit',
                 'apr_percentage': random.uniform(15.99, 29.99),
                 'apr_type': 'variable',

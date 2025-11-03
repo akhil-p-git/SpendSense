@@ -15,6 +15,11 @@ def detect_subscriptions(transactions_df, window_days=90):
 
     Returns: dict with recurring_merchants, monthly_recurring_spend, subscription_share
     """
+    # Ensure dates are datetime objects
+    if not pd.api.types.is_datetime64_any_dtype(transactions_df['date']):
+        transactions_df = transactions_df.copy()
+        transactions_df['date'] = pd.to_datetime(transactions_df['date'])
+
     # Filter to window
     end_date = transactions_df['date'].max()
     start_date = end_date - timedelta(days=window_days)
@@ -68,6 +73,11 @@ def detect_savings_behavior(transactions_df, accounts_df, window_days=180):
 
     Returns: dict with net_savings_inflow, growth_rate, emergency_fund_coverage
     """
+    # Ensure dates are datetime objects
+    if not pd.api.types.is_datetime64_any_dtype(transactions_df['date']):
+        transactions_df = transactions_df.copy()
+        transactions_df['date'] = pd.to_datetime(transactions_df['date'])
+
     # Get savings-type accounts
     savings_accounts = accounts_df[
         accounts_df['type'].isin(['savings', 'money market', 'hsa'])
@@ -192,6 +202,11 @@ def detect_income_stability(transactions_df, accounts_df, window_days=180):
 
     Returns: dict with payroll frequency, variability, cash flow buffer
     """
+    # Ensure dates are datetime objects
+    if not pd.api.types.is_datetime64_any_dtype(transactions_df['date']):
+        transactions_df = transactions_df.copy()
+        transactions_df['date'] = pd.to_datetime(transactions_df['date'])
+
     # Get checking accounts
     checking_accounts = accounts_df[accounts_df['type'] == 'checking']['account_id'].tolist()
 

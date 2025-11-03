@@ -76,15 +76,15 @@ def load_data_to_db(data_dict: dict):
         if len(liabilities_df) > 0:
             print(f"Loading {len(liabilities_df)} liabilities...")
             for _, liability in liabilities_df.iterrows():
-            Liability.save(
-                account_id=liability['account_id'],
-                user_id=liability['user_id'],
-                liability_type=liability.get('type'),
-                apr=float(liability.get('apr') or liability.get('apr_percentage', 0)) if pd.notna(liability.get('apr')) or pd.notna(liability.get('apr_percentage')) else None,
-                minimum_payment=float(liability.get('minimum_payment') or liability.get('minimum_payment_amount', 0)) if pd.notna(liability.get('minimum_payment')) or pd.notna(liability.get('minimum_payment_amount')) else None,
-                last_payment_date=liability.get('last_payment_date'),
-                last_payment_amount=float(liability['last_payment_amount']) if pd.notna(liability.get('last_payment_amount')) else None
-            )
+                Liability.save(
+                    account_id=liability['account_id'],
+                    user_id=liability['user_id'],
+                    liability_type=liability.get('type'),
+                    apr=float(liability.get('apr') or liability.get('apr_percentage', 0)) if pd.notna(liability.get('apr')) or pd.notna(liability.get('apr_percentage')) else None,
+                    minimum_payment=float(liability.get('minimum_payment') or liability.get('minimum_payment_amount', 0)) if pd.notna(liability.get('minimum_payment')) or pd.notna(liability.get('minimum_payment_amount')) else None,
+                    last_payment_date=liability.get('last_payment_date'),
+                    last_payment_amount=float(liability['last_payment_amount']) if pd.notna(liability.get('last_payment_amount')) else None
+                )
             print("✓ Liabilities loaded")
         else:
             print("✓ No liabilities to load")
