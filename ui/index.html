@@ -59,44 +59,139 @@
             <div id="whatif" class="tab-content">
                 <h2>What-If Scenario Simulator</h2>
                 
-                <div class="what-if-container">
-                    <h3>Extra Debt Payment</h3>
-                    <div class="card">
-                        <div class="slider-container">
-                            <div class="slider-label">
-                                <span>Extra Monthly Payment</span>
-                                <span id="payment-value">$300</span>
+                <!-- Scenario Type Selector -->
+                <div class="scenario-tabs" style="display: flex; gap: 0.5rem; margin-bottom: 1.5rem; border-bottom: 2px solid #e5e7eb;">
+                    <button class="scenario-tab active" onclick="showScenarioType('basic')">Basic Scenarios</button>
+                    <button class="scenario-tab" onclick="showScenarioType('goal')">Goal-Based Planning</button>
+                    <button class="scenario-tab" onclick="showScenarioType('combined')">Combined Scenarios</button>
+                    <button class="scenario-tab" onclick="showScenarioType('compare')">Compare Scenarios</button>
+                </div>
+                
+                <!-- Basic Scenarios -->
+                <div id="basic-scenarios" class="scenario-section">
+                    <div class="what-if-container">
+                        <h3>Extra Debt Payment</h3>
+                        <div class="card">
+                            <div class="slider-container">
+                                <div class="slider-label">
+                                    <span>Extra Monthly Payment</span>
+                                    <span id="payment-value">$300</span>
+                                </div>
+                                <input type="range" min="0" max="1000" value="300" class="slider" id="payment-slider" oninput="updatePaymentSlider(this.value)">
                             </div>
-                            <input type="range" min="0" max="1000" value="300" class="slider" id="payment-slider" oninput="updatePaymentSlider(this.value)">
+                            <div id="debtPaymentResults"></div>
                         </div>
-                        <div id="debtPaymentResults"></div>
+                    </div>
+
+                    <div class="what-if-container" style="margin-top: 2rem;">
+                        <h3>Subscription Cancellation</h3>
+                        <div class="card">
+                            <div id="subscriptionList"></div>
+                            <div id="subscriptionResults"></div>
+                        </div>
+                    </div>
+
+                    <div class="what-if-container" style="margin-top: 2rem;">
+                        <h3>Increased Savings</h3>
+                        <div class="card">
+                            <div class="slider-container">
+                                <div class="slider-label">
+                                    <span>Monthly Savings Amount</span>
+                                    <span id="savings-value">$500</span>
+                                </div>
+                                <input type="range" min="0" max="2000" value="500" class="slider" id="savings-slider" oninput="updateSavingsSlider(this.value)">
+                            </div>
+                            <div class="slider-container" style="margin-top: 1rem;">
+                                <label>Target Amount (optional):</label>
+                                <input type="number" id="target-amount" placeholder="10000" class="input-field">
+                            </div>
+                            <div id="savingsResults"></div>
+                        </div>
                     </div>
                 </div>
-
-                <div class="what-if-container" style="margin-top: 2rem;">
-                    <h3>Subscription Cancellation</h3>
-                    <div class="card">
-                        <div id="subscriptionList"></div>
-                        <div id="subscriptionResults"></div>
+                
+                <!-- Goal-Based Planning -->
+                <div id="goal-scenarios" class="scenario-section" style="display: none;">
+                    <div class="what-if-container">
+                        <h3>Goal-Based Debt Payoff</h3>
+                        <div class="card">
+                            <div class="slider-container">
+                                <div class="slider-label">
+                                    <span>Target Months to Payoff</span>
+                                    <span id="goal-months-value">12</span>
+                                </div>
+                                <input type="range" min="6" max="60" value="12" class="slider" id="goal-months-slider" oninput="updateGoalMonthsSlider(this.value)">
+                            </div>
+                            <div class="slider-container" style="margin-top: 1rem;">
+                                <label>Max Monthly Payment (optional):</label>
+                                <input type="number" id="max-payment" placeholder="1000" class="input-field">
+                            </div>
+                            <button class="btn btn-primary" onclick="runGoalBasedPlanning()" style="margin-top: 1rem;">Calculate Required Payment</button>
+                            <div id="goalResults"></div>
+                        </div>
                     </div>
                 </div>
-
-                <div class="what-if-container" style="margin-top: 2rem;">
-                    <h3>Increased Savings</h3>
-                    <div class="card">
-                        <div class="slider-container">
-                            <div class="slider-label">
-                                <span>Monthly Savings Amount</span>
-                                <span id="savings-value">$500</span>
+                
+                <!-- Combined Scenarios -->
+                <div id="combined-scenarios" class="scenario-section" style="display: none;">
+                    <div class="what-if-container">
+                        <h3>Combined Scenario Builder</h3>
+                        <div class="card">
+                            <div style="margin-bottom: 1rem;">
+                                <label><input type="checkbox" id="combined-extra-payment" onchange="updateCombinedScenario()"> Extra Credit Payment</label>
+                                <input type="number" id="combined-payment-amount" placeholder="200" class="input-field" style="margin-left: 0.5rem; width: 150px;" onchange="updateCombinedScenario()" disabled>
                             </div>
-                            <input type="range" min="0" max="2000" value="500" class="slider" id="savings-slider" oninput="updateSavingsSlider(this.value)">
+                            <div style="margin-bottom: 1rem;">
+                                <label><input type="checkbox" id="combined-cancel-subscriptions" onchange="updateCombinedScenario()"> Cancel Subscriptions</label>
+                                <div id="combined-subscription-list" style="margin-left: 1.5rem; margin-top: 0.5rem;"></div>
+                            </div>
+                            <div style="margin-bottom: 1rem;">
+                                <label><input type="checkbox" id="combined-increase-savings" onchange="updateCombinedScenario()"> Increase Savings</label>
+                                <input type="number" id="combined-savings-amount" placeholder="500" class="input-field" style="margin-left: 0.5rem; width: 150px;" onchange="updateCombinedScenario()" disabled>
+                            </div>
+                            <button class="btn btn-primary" onclick="runCombinedScenario()" style="margin-top: 1rem;">Run Combined Scenario</button>
+                            <div id="combinedResults"></div>
                         </div>
-                        <div class="slider-container" style="margin-top: 1rem;">
-                            <label>Target Amount (optional):</label>
-                            <input type="number" id="target-amount" placeholder="10000" class="input-field">
-                        </div>
-                        <div id="savingsResults"></div>
                     </div>
+                </div>
+                
+                <!-- Comparison Mode -->
+                <div id="compare-scenarios" class="scenario-section" style="display: none;">
+                    <div class="what-if-container">
+                        <h3>Compare Two Scenarios</h3>
+                        <div class="card">
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+                                <div>
+                                    <h4>Scenario A</h4>
+                                    <select id="compare-a-type" class="input-field" onchange="updateCompareScenario('a')">
+                                        <option value="">Select scenario type...</option>
+                                        <option value="extra_credit_payment">Extra Credit Payment</option>
+                                        <option value="subscription_cancellation">Cancel Subscriptions</option>
+                                        <option value="increased_savings">Increase Savings</option>
+                                    </select>
+                                    <div id="compare-a-params" style="margin-top: 0.5rem;"></div>
+                                </div>
+                                <div>
+                                    <h4>Scenario B</h4>
+                                    <select id="compare-b-type" class="input-field" onchange="updateCompareScenario('b')">
+                                        <option value="">Select scenario type...</option>
+                                        <option value="extra_credit_payment">Extra Credit Payment</option>
+                                        <option value="subscription_cancellation">Cancel Subscriptions</option>
+                                        <option value="increased_savings">Increase Savings</option>
+                                    </select>
+                                    <div id="compare-b-params" style="margin-top: 0.5rem;"></div>
+                                </div>
+                            </div>
+                            <button class="btn btn-primary" onclick="runComparison()" style="margin-top: 1rem;">Compare Scenarios</button>
+                            <div id="compareResults"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Export Button (appears when results are shown) -->
+                <div id="export-buttons" style="display: none; margin-top: 2rem; text-align: right;">
+                    <button class="btn btn-secondary" onclick="exportScenario('json')">Export as JSON</button>
+                    <button class="btn btn-secondary" onclick="exportScenario('pdf')" style="margin-left: 0.5rem;">Export as PDF</button>
                 </div>
             </div>
 
@@ -113,14 +208,70 @@
             <!-- Operator Dashboard Tab -->
             <div id="operator" class="tab-content">
                 <h2>Operator Dashboard</h2>
-                <div class="operator-dashboard">
-                    <div class="filter-bar">
-                        <button class="filter-button active" onclick="filterUsers('all')">All Users</button>
-                        <button class="filter-button" onclick="filterUsers('high_utilization')">High Utilization</button>
-                        <button class="filter-button" onclick="filterUsers('subscription_heavy')">Subscription-Heavy</button>
-                        <button class="filter-button" onclick="loadEvaluationReport()">Evaluation Report</button>
+                
+                <!-- Analytics Section -->
+                <div class="operator-analytics">
+                    <div class="analytics-grid">
+                        <!-- Persona Distribution -->
+                        <div class="card">
+                            <h3>Persona Distribution</h3>
+                            <div id="personaChart"></div>
+                        </div>
+                        
+                        <!-- Recommendation Tracking -->
+                        <div class="card">
+                            <h3>Recommendation Acceptance</h3>
+                            <div id="recommendationTracking"></div>
+                        </div>
+                        
+                        <!-- System Health -->
+                        <div class="card">
+                            <h3>System Health</h3>
+                            <div id="systemHealth"></div>
+                        </div>
                     </div>
-                    <div id="userList"></div>
+                </div>
+                
+                <!-- Filters and User List -->
+                <div class="operator-dashboard" style="margin-top: 2rem;">
+                    <div class="filter-bar">
+                        <div class="filter-group">
+                            <label>Filter by Persona:</label>
+                            <select id="personaFilter" onchange="applyFilters()">
+                                <option value="">All Personas</option>
+                                <option value="high_utilization">High Utilization</option>
+                                <option value="variable_income">Variable Income</option>
+                                <option value="subscription_heavy">Subscription-Heavy</option>
+                                <option value="emergency_fund_starter">Emergency Fund Starter</option>
+                                <option value="savings_builder">Savings Builder</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label>Filter by Signal:</label>
+                            <select id="signalFilter" onchange="applyFilters()">
+                                <option value="">All Signals</option>
+                                <option value="subscriptions">Subscriptions</option>
+                                <option value="savings">Savings</option>
+                                <option value="credit">Credit</option>
+                                <option value="income">Income</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label>Consent Status:</label>
+                            <select id="consentFilter" onchange="applyFilters()">
+                                <option value="">All Users</option>
+                                <option value="true">With Consent</option>
+                                <option value="false">No Consent</option>
+                            </select>
+                        </div>
+                        <button class="btn btn-primary" onclick="exportEvaluationPDF()" style="margin-left: auto;">
+                            Export PDF Report
+                        </button>
+                    </div>
+                    
+                    <div id="userList" style="margin-top: 1rem;"></div>
+                    
+                    <!-- Evaluation Report Section -->
                     <div id="evaluationReport" style="margin-top: 2rem;"></div>
                 </div>
             </div>

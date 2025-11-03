@@ -48,3 +48,6 @@ scipy==1.11.4
 black==23.11.0
 flake8==6.1.0
 mypy==1.7.1
+
+# PDF generation for reports
+reportlab==4.0.7

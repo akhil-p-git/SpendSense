@@ -59,9 +59,9 @@ class WhatIfSimulator:
 
         current_balance = account['balance_current']
         credit_limit = account['balance_limit']
-        apr = liability['apr_percentage']
+        apr = liability.get('apr') or liability.get('apr_percentage', 0)
         monthly_rate = apr / 100 / 12
-        current_minimum = liability['minimum_payment_amount']
+        current_minimum = liability.get('minimum_payment') or liability.get('minimum_payment_amount', 0)
 
         # Calculate current payoff scenario (minimum payments only)
         current_scenario = self._amortize_debt(
@@ -260,7 +260,7 @@ class WhatIfSimulator:
             )
         }
 
-    def simulate_combined_scenario(self, scenarios):
+    def simulate_combined_scenario(self, scenarios, months=12):
         """
         Simulate multiple changes at once
 
@@ -271,42 +271,248 @@ class WhatIfSimulator:
                     {'type': 'subscription_cancellation', 'subscriptions': [...]},
                     {'type': 'increased_savings', 'amount': 500}
                 ]
+            months: Number of months to project
 
         Returns:
             Dictionary with combined impact
         """
         results = []
         total_monthly_impact = 0
+        total_interest_saved = 0
+        total_monthly_savings = 0
 
         for scenario in scenarios:
             if scenario['type'] == 'extra_credit_payment':
                 result = self.simulate_extra_credit_payment(
                     scenario['account_id'],
-                    scenario['amount']
+                    scenario['amount'],
+                    months
                 )
                 total_monthly_impact -= scenario['amount']  # Cash outflow
+                total_interest_saved += result['savings']['interest_saved']
                 results.append(result)
 
             elif scenario['type'] == 'subscription_cancellation':
                 result = self.simulate_subscription_cancellation(
-                    scenario['subscriptions']
+                    scenario['subscriptions'],
+                    months
                 )
                 total_monthly_impact += result['monthly_savings']  # Cash inflow
+                total_monthly_savings += result['monthly_savings']
                 results.append(result)
 
             elif scenario['type'] == 'increased_savings':
                 result = self.simulate_increased_savings(
-                    scenario['amount']
+                    scenario['amount'],
+                    scenario.get('target_amount'),
+                    months
                 )
                 total_monthly_impact -= scenario['amount']  # Cash outflow
                 results.append(result)
 
+        # Calculate net cash flow
+        net_monthly_impact = total_monthly_impact + total_monthly_savings
+        annual_impact = net_monthly_impact * 12
+
         return {
             'scenario_type': 'combined',
             'individual_scenarios': results,
-            'monthly_cash_flow_impact': total_monthly_impact,
-            'summary': self._generate_combined_summary(results)
+            'monthly_cash_flow_impact': net_monthly_impact,
+            'annual_cash_flow_impact': annual_impact,
+            'total_interest_saved': total_interest_saved,
+            'total_subscription_savings': total_monthly_savings * 12,
+            'projection_months': months,
+            'summary': self._generate_combined_summary(results),
+            'recommendation': self._generate_combined_recommendation(
+                net_monthly_impact,
+                total_interest_saved,
+                total_monthly_savings
+            )
         }
+    
+    def calculate_goal_based_payment(self, account_id, target_months, max_monthly_payment=None):
+        """
+        Calculate required monthly payment to pay off debt in target months (goal-based planning)
+        
+        Args:
+            account_id: Credit card account ID
+            target_months: Target months to payoff (e.g., 12)
+            max_monthly_payment: Optional maximum monthly payment user can afford
+            
+        Returns:
+            Dictionary with required payment and comparison to current
+        """
+        # Get account and liability info
+        account_rows = self.accounts[self.accounts['account_id'] == account_id]
+        if account_rows.empty:
+            raise ValueError(f"Account {account_id} not found for user")
+        
+        account = account_rows.iloc[0]
+        liability_rows = self.liabilities[self.liabilities['account_id'] == account_id]
+        if liability_rows.empty:
+            raise ValueError(f"Liability information not found for account {account_id}")
+        
+        liability = liability_rows.iloc[0]
+        
+        current_balance = account['balance_current']
+        apr = liability.get('apr') or liability.get('apr_percentage', 0)
+        monthly_rate = apr / 100 / 12
+        current_minimum = liability.get('minimum_payment') or liability.get('minimum_payment_amount', 0)
+        
+        # Calculate required payment using amortization formula
+        if monthly_rate == 0:
+            required_payment = current_balance / target_months
+        else:
+            # PMT formula: PMT = PV * r * (1 + r)^n / ((1 + r)^n - 1)
+            numerator = monthly_rate * ((1 + monthly_rate) ** target_months)
+            denominator = ((1 + monthly_rate) ** target_months) - 1
+            required_payment = current_balance * (numerator / denominator)
+        
+        # Round up to nearest dollar
+        required_payment = np.ceil(required_payment)
+        
+        # Check if exceeds max payment
+        is_feasible = True
+        if max_monthly_payment and required_payment > max_monthly_payment:
+            is_feasible = False
+            # Calculate actual months with max payment
+            actual_scenario = self._amortize_debt(
+                current_balance,
+                monthly_rate,
+                max_monthly_payment
+            )
+            actual_months = actual_scenario['months_to_payoff']
+        else:
+            actual_months = target_months
+        
+        # Calculate scenarios for comparison
+        current_scenario = self._amortize_debt(
+            current_balance,
+            monthly_rate,
+            current_minimum
+        )
+        
+        goal_scenario = self._amortize_debt(
+            current_balance,
+            monthly_rate,
+            required_payment
+        )
+        
+        # Calculate impact
+        interest_saved = current_scenario['total_interest'] - goal_scenario['total_interest']
+        months_saved = current_scenario['months_to_payoff'] - actual_months
+        
+        return {
+            'scenario_type': 'goal_based_payment',
+            'account_id': account_id,
+            'current_balance': current_balance,
+            'target_months': target_months,
+            'required_monthly_payment': float(required_payment),
+            'current_minimum_payment': current_minimum,
+            'payment_increase': float(required_payment - current_minimum),
+            'is_feasible': is_feasible,
+            'actual_months': actual_months if not is_feasible else target_months,
+            'max_monthly_payment': max_monthly_payment,
+            'current_scenario': {
+                'monthly_payment': current_minimum,
+                'months_to_payoff': current_scenario['months_to_payoff'],
+                'total_interest': current_scenario['total_interest'],
+                'total_paid': current_scenario['total_paid']
+            },
+            'goal_scenario': {
+                'monthly_payment': float(required_payment),
+                'months_to_payoff': actual_months,
+                'total_interest': goal_scenario['total_interest'],
+                'total_paid': goal_scenario['total_paid']
+            },
+            'impact': {
+                'interest_saved': interest_saved,
+                'months_saved': months_saved,
+                'total_saved': interest_saved,
+                'percent_interest_saved': (interest_saved / current_scenario['total_interest'] * 100) if current_scenario['total_interest'] > 0 else 0
+            },
+            'recommendation': self._generate_goal_recommendation(
+                required_payment,
+                current_minimum,
+                target_months,
+                actual_months,
+                is_feasible,
+                interest_saved
+            )
+        }
+    
+    def compare_scenarios(self, scenario_a, scenario_b):
+        """
+        Compare two scenarios side by side
+        
+        Args:
+            scenario_a: First scenario result dictionary
+            scenario_b: Second scenario result dictionary
+            
+        Returns:
+            Dictionary with comparison metrics
+        """
+        comparison = {
+            'scenario_type': 'comparison',
+            'scenario_a': scenario_a,
+            'scenario_b': scenario_b,
+            'comparison_metrics': {}
+        }
+        
+        # Extract comparable metrics based on scenario types
+        if scenario_a['scenario_type'] == scenario_b['scenario_type']:
+            # Same type scenarios - direct comparison
+            if scenario_a['scenario_type'] == 'extra_credit_payment':
+                comparison['comparison_metrics'] = {
+                    'interest_saved_a': scenario_a['savings']['interest_saved'],
+                    'interest_saved_b': scenario_b['savings']['interest_saved'],
+                    'interest_difference': scenario_b['savings']['interest_saved'] - scenario_a['savings']['interest_saved'],
+                    'months_saved_a': scenario_a['savings']['months_saved'],
+                    'months_saved_b': scenario_b['savings']['months_saved'],
+                    'months_difference': scenario_b['savings']['months_saved'] - scenario_a['savings']['months_saved'],
+                    'payment_a': scenario_a['extra_payment_scenario']['monthly_payment'],
+                    'payment_b': scenario_b['extra_payment_scenario']['monthly_payment'],
+                    'better_scenario': 'B' if scenario_b['savings']['interest_saved'] > scenario_a['savings']['interest_saved'] else 'A',
+                    'recommendation': self._generate_comparison_recommendation(
+                        scenario_a, scenario_b, 'credit_payment'
+                    )
+                }
+            
+            elif scenario_a['scenario_type'] == 'subscription_cancellation':
+                comparison['comparison_metrics'] = {
+                    'monthly_savings_a': scenario_a['monthly_savings'],
+                    'monthly_savings_b': scenario_b['monthly_savings'],
+                    'savings_difference': scenario_b['monthly_savings'] - scenario_a['monthly_savings'],
+                    'annual_savings_a': scenario_a['annual_savings'],
+                    'annual_savings_b': scenario_b['annual_savings'],
+                    'better_scenario': 'B' if scenario_b['monthly_savings'] > scenario_a['monthly_savings'] else 'A',
+                    'recommendation': self._generate_comparison_recommendation(
+                        scenario_a, scenario_b, 'subscription'
+                    )
+                }
+            
+            elif scenario_a['scenario_type'] == 'increased_savings':
+                comparison['comparison_metrics'] = {
+                    'final_balance_a': scenario_a['projected_state']['final_balance'],
+                    'final_balance_b': scenario_b['projected_state']['final_balance'],
+                    'balance_difference': scenario_b['projected_state']['final_balance'] - scenario_a['projected_state']['final_balance'],
+                    'interest_earned_a': scenario_a['projected_state']['interest_earned'],
+                    'interest_earned_b': scenario_b['projected_state']['interest_earned'],
+                    'better_scenario': 'B' if scenario_b['projected_state']['final_balance'] > scenario_a['projected_state']['final_balance'] else 'A',
+                    'recommendation': self._generate_comparison_recommendation(
+                        scenario_a, scenario_b, 'savings'
+                    )
+                }
+        else:
+            # Different scenario types - compare overall financial impact
+            comparison['comparison_metrics'] = {
+                'type_a': scenario_a['scenario_type'],
+                'type_b': scenario_b['scenario_type'],
+                'recommendation': "These scenarios affect different aspects of your finances. Consider your priorities: debt payoff, spending reduction, or savings growth.",
+                'summary': self._generate_cross_type_comparison(scenario_a, scenario_b)
+            }
+        
+        return comparison
 
     # Helper methods
 
@@ -418,6 +624,61 @@ class WhatIfSimulator:
                 )
 
         return summary_parts
+    
+    def _generate_combined_recommendation(self, net_impact, interest_saved, subscription_savings):
+        """Generate recommendation for combined scenarios"""
+        if net_impact > 0:
+            return f"Great strategy! This plan improves your cash flow by ${net_impact:,.2f}/month, saves ${interest_saved:,.2f} in interest, and frees up ${subscription_savings:,.2f}/year from subscriptions."
+        elif net_impact == 0:
+            return f"This plan is cash-flow neutral but saves ${interest_saved:,.2f} in interest and frees up ${subscription_savings:,.2f}/year from subscriptions."
+        else:
+            return f"This plan requires ${abs(net_impact):,.2f}/month additional cash flow but will save ${interest_saved:,.2f} in interest and free up ${subscription_savings:,.2f}/year from subscriptions. Consider phasing in changes gradually."
+    
+    def _generate_goal_recommendation(self, required_payment, current_minimum, target_months, actual_months, is_feasible, interest_saved):
+        """Generate recommendation for goal-based planning"""
+        if is_feasible:
+            return f"To pay off your debt in {target_months} months, increase your monthly payment from ${current_minimum:,.2f} to ${required_payment:,.2f}. This will save ${interest_saved:,.2f} in interest."
+        else:
+            return f"To pay off in {target_months} months, you'd need ${required_payment:,.2f}/month (${actual_months:.0f} months at your max of ${required_payment:,.2f}/month). You'll still save ${interest_saved:,.2f} in interest compared to minimum payments."
+    
+    def _generate_comparison_recommendation(self, scenario_a, scenario_b, scenario_type):
+        """Generate recommendation comparing two scenarios"""
+        if scenario_type == 'credit_payment':
+            if scenario_b['savings']['interest_saved'] > scenario_a['savings']['interest_saved']:
+                return f"Scenario B saves ${scenario_b['savings']['interest_saved'] - scenario_a['savings']['interest_saved']:,.2f} more in interest and pays off {scenario_b['savings']['months_saved'] - scenario_a['savings']['months_saved']:.0f} months faster."
+            else:
+                return f"Scenario A saves ${scenario_a['savings']['interest_saved'] - scenario_b['savings']['interest_saved']:,.2f} more in interest, but requires ${scenario_a['extra_payment_scenario']['monthly_payment'] - scenario_b['extra_payment_scenario']['monthly_payment']:,.2f}/month more."
+        elif scenario_type == 'subscription':
+            if scenario_b['monthly_savings'] > scenario_a['monthly_savings']:
+                return f"Scenario B saves ${scenario_b['monthly_savings'] - scenario_a['monthly_savings']:,.2f} more per month (${(scenario_b['annual_savings'] - scenario_a['annual_savings']):,.2f}/year)."
+            else:
+                return f"Scenario A saves ${scenario_a['monthly_savings'] - scenario_b['monthly_savings']:,.2f} more per month."
+        elif scenario_type == 'savings':
+            if scenario_b['projected_state']['final_balance'] > scenario_a['projected_state']['final_balance']:
+                return f"Scenario B grows your savings ${scenario_b['projected_state']['final_balance'] - scenario_a['projected_state']['final_balance']:,.2f} more, earning ${scenario_b['projected_state']['interest_earned'] - scenario_a['projected_state']['interest_earned']:,.2f} additional interest."
+            else:
+                return f"Scenario A grows your savings ${scenario_a['projected_state']['final_balance'] - scenario_b['projected_state']['final_balance']:,.2f} more."
+        return "Compare the scenarios to see which better aligns with your financial goals."
+    
+    def _generate_cross_type_comparison(self, scenario_a, scenario_b):
+        """Generate summary for comparing different scenario types"""
+        impacts = []
+        
+        if scenario_a['scenario_type'] == 'extra_credit_payment':
+            impacts.append(f"Scenario A: Saves ${scenario_a['savings']['interest_saved']:,.2f} in interest")
+        elif scenario_a['scenario_type'] == 'subscription_cancellation':
+            impacts.append(f"Scenario A: Saves ${scenario_a['monthly_savings']:,.2f}/month from subscriptions")
+        elif scenario_a['scenario_type'] == 'increased_savings':
+            impacts.append(f"Scenario A: Grows savings to ${scenario_a['projected_state']['final_balance']:,.2f}")
+        
+        if scenario_b['scenario_type'] == 'extra_credit_payment':
+            impacts.append(f"Scenario B: Saves ${scenario_b['savings']['interest_saved']:,.2f} in interest")
+        elif scenario_b['scenario_type'] == 'subscription_cancellation':
+            impacts.append(f"Scenario B: Saves ${scenario_b['monthly_savings']:,.2f}/month from subscriptions")
+        elif scenario_b['scenario_type'] == 'increased_savings':
+            impacts.append(f"Scenario B: Grows savings to ${scenario_b['projected_state']['final_balance']:,.2f}")
+        
+        return impacts
 
 
 def run_example_scenarios():

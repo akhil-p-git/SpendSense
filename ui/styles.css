@@ -354,11 +354,54 @@ body {
     box-shadow: 0 2px 8px rgba(0,0,0,0.1);
 }
 
+.operator-analytics {
+    margin-bottom: 2rem;
+}
+
+.analytics-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.analytics-grid .card {
+    min-height: 300px;
+}
+
 .filter-bar {
     display: flex;
     gap: 1rem;
     margin-bottom: 1.5rem;
     flex-wrap: wrap;
+    align-items: end;
+}
+
+.filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.filter-group label {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #374151;
+}
+
+.filter-group select {
+    padding: 0.5rem 1rem;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    background: white;
+    font-size: 0.875rem;
+    min-width: 150px;
+}
+
+.filter-group select:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
 }
 
 .filter-button {
@@ -379,7 +422,7 @@ body {
 
 .user-row {
     display: grid;
-    grid-template-columns: 2fr 1fr 2fr 1fr;
+    grid-template-columns: 2fr 1.5fr 1.5fr 1fr 1fr;
     gap: 1rem;
     padding: 1rem;
     border-bottom: 1px solid #e0e0e0;
@@ -388,6 +431,43 @@ body {
 
 .user-row:last-child {
     border-bottom: none;
+}
+
+.user-row:hover {
+    background: #f9fafb;
+}
+
+/* Scenario Tabs */
+.scenario-tabs {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+    border-bottom: 2px solid #e5e7eb;
+}
+
+.scenario-tab {
+    padding: 0.75rem 1.5rem;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    font-weight: 500;
+    color: #6b7280;
+    transition: all 0.2s;
+    margin-bottom: -2px;
+}
+
+.scenario-tab:hover {
+    color: #2563eb;
+}
+
+.scenario-tab.active {
+    color: #2563eb;
+    border-bottom-color: #2563eb;
+}
+
+.scenario-section {
+    margin-top: 1rem;
 }
 
 /* Buttons */

@@ -233,13 +233,14 @@ def generate_liabilities(accounts_df):
     return pd.DataFrame(liabilities) if liabilities else pd.DataFrame()
 
 
-def generate_synthetic_data(num_users=75, output_dir='data'):
+def generate_synthetic_data(num_users=75, output_dir='data', save_to_db=True):
     """
     Generate complete synthetic dataset
 
     Args:
         num_users: Number of users to generate (50-100)
         output_dir: Directory to save output files
+        save_to_db: If True, save to SQLite database instead of CSV
 
     Returns:
         Dictionary containing all dataframes
@@ -259,16 +260,30 @@ def generate_synthetic_data(num_users=75, output_dir='data'):
     liabilities_df = generate_liabilities(accounts_df)
     print(f"✓ Generated {len(liabilities_df)} liabilities")
 
-    # Save to CSV
+    # Save to database or CSV
     import os
     os.makedirs(output_dir, exist_ok=True)
 
-    users_df.to_csv(f'{output_dir}/users.csv', index=False)
-    accounts_df.to_csv(f'{output_dir}/accounts.csv', index=False)
-    transactions_df.to_csv(f'{output_dir}/transactions.csv', index=False)
-    liabilities_df.to_csv(f'{output_dir}/liabilities.csv', index=False)
+    if save_to_db:
+        try:
+            from db.loader import load_data_to_db
+            load_data_to_db({
+                'users': users_df,
+                'accounts': accounts_df,
+                'transactions': transactions_df,
+                'liabilities': liabilities_df
+            })
+            print(f"\n✓ Data saved to SQLite database")
+        except ImportError:
+            print("Warning: Database module not available, saving to CSV instead")
+            save_to_db = False
 
-    print(f"\n✓ Data saved to {output_dir}/ directory")
+    if not save_to_db:
+        users_df.to_csv(f'{output_dir}/users.csv', index=False)
+        accounts_df.to_csv(f'{output_dir}/accounts.csv', index=False)
+        transactions_df.to_csv(f'{output_dir}/transactions.csv', index=False)
+        liabilities_df.to_csv(f'{output_dir}/liabilities.csv', index=False)
+        print(f"\n✓ Data saved to {output_dir}/ directory")
 
     return {
         'users': users_df,
