@@ -1,0 +1,32 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-gray-50 text-gray-900;
+  }
+}
+
+@layer components {
+  .result-metric {
+    @apply flex items-center justify-between py-2 border-b border-gray-100 last:border-b-0;
+  }
+  
+  .result-metric span {
+    @apply text-gray-600;
+  }
+  
+  .result-metric strong {
+    @apply text-gray-900 font-semibold;
+  }
+  
+  .result-metric .positive {
+    @apply text-success-600;
+  }
+  
+  .result-metric .warning {
+    @apply text-warning-600;
+  }
+}
+

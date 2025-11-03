@@ -170,15 +170,18 @@ def detect_credit_behavior(accounts_df, liabilities_df):
     if not liabilities_df.empty:
         for _, liability in liabilities_df.iterrows():
             # If last payment ≈ minimum payment, flag it
-            if liability['last_payment_amount'] <= liability['minimum_payment_amount'] * 1.1:
-                minimum_payment_only = True
+            # Check if columns exist before accessing
+            if pd.notna(liability.get('last_payment_amount')) and pd.notna(liability.get('minimum_payment')):
+                if liability['last_payment_amount'] <= liability['minimum_payment'] * 1.1:
+                    minimum_payment_only = True
 
             # Interest charges present if APR > 0 and balance > 0
             account = credit_accounts[credit_accounts['account_id'] == liability['account_id']]
             if not account.empty and account.iloc[0]['balance_current'] > 0:
                 has_interest_charges = True
 
-            if liability['is_overdue']:
+            # Check overdue status if column exists
+            if 'is_overdue' in liability.index and liability['is_overdue']:
                 is_overdue = True
 
     return {

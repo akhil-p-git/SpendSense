@@ -94,3 +94,10 @@ ui/designs/
 *.temp
 .cache/
 
+# React frontend
+ui-react/node_modules/
+ui-react/dist/
+ui-react/.vite/
+ui-react/.env
+ui-react/.env.local
+

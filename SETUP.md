@@ -35,22 +35,22 @@ This will:
 python app.py
 ```
 
-The API will be available at `http://localhost:5000`
+The API will be available at `http://localhost:8000`
 
 ### 5. Test the API
 
 ```bash
 # Get list of users
-curl http://localhost:5000/users
+curl http://localhost:8000/users
 
 # Get user profile (replace with actual user_id)
-curl http://localhost:5000/profile/user_0001
+curl http://localhost:8000/profile/user_0001
 
 # Get recommendations
-curl http://localhost:5000/recommendations/user_0001
+curl http://localhost:8000/recommendations/user_0001
 
 # Run What-If: Extra credit card payment
-curl -X POST http://localhost:5000/what-if \
+curl -X POST http://localhost:8000/what-if \
   -H "Content-Type: application/json" \
   -d '{
     "user_id": "user_0001",
@@ -143,9 +143,9 @@ pip install -r requirements.txt
 
 **Permission errors**: Use virtual environment (don't use --break-system-packages)
 
-**Port 5000 already in use**: Change port in app.py or kill existing process:
+**Port 8000 already in use**: Change port in app.py or kill existing process:
 ```bash
-lsof -ti:5000 | xargs kill -9
+lsof -ti:8000 | xargs kill -9
 ```
 
 ## What Makes This Project Stand Out

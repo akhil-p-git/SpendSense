@@ -1,0 +1,2 @@
+export { RecommendationsView } from './RecommendationsView';
+

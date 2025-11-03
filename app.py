@@ -37,8 +37,16 @@ from db.models import (
     PersonaAssignment, BehavioralSignal, UserSession
 )
 
-app = Flask(__name__, static_folder='ui', static_url_path='')
-CORS(app, resources={r"/*": {"origins": "*", "allow_headers": ["Content-Type"], "methods": ["GET", "POST", "OPTIONS"]}})
+# Serve React build in production, fallback to old UI for backup
+import os
+REACT_BUILD_PATH = os.path.join(os.path.dirname(__file__), 'ui-react', 'dist')
+OLD_UI_PATH = os.path.join(os.path.dirname(__file__), 'ui')
+
+# Use React build if it exists, otherwise fall back to old UI
+static_folder = REACT_BUILD_PATH if os.path.exists(REACT_BUILD_PATH) else OLD_UI_PATH
+
+app = Flask(__name__, static_folder=static_folder, static_url_path='')
+CORS(app, resources={r"/*": {"origins": "*", "allow_headers": ["Content-Type", "Authorization"], "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"]}})
 
 # Initialize database
 print("Initializing SpendSense...")
@@ -74,12 +82,6 @@ app_start_time = datetime.now()
 
 # In-memory tracking for quick access (also saved to DB)
 timings_history = []
-
-
-@app.route('/')
-def home():
-    """Serve the frontend UI"""
-    return send_from_directory('ui', 'index.html')
 
 
 @app.route('/api/health')
@@ -931,14 +933,14 @@ def get_system_health():
             'target_met': avg_latency < 5.0
         },
         'users': {
-            'total': total_users,
-            'with_consent': users_with_consent,
+            'total': int(total_users),
+            'with_consent': int(users_with_consent),
             'consent_rate_percent': round(consent_rate, 1)
         },
         'recommendations': {
-            'total_generated': total_recommendations,
-            'total_views': total_views,
-            'total_acceptances': total_acceptances,
+            'total_generated': int(total_recommendations),
+            'total_views': int(total_views),
+            'total_acceptances': int(total_acceptances),
             'acceptance_rate_percent': round((total_acceptances / total_views * 100) if total_views > 0 else 0, 1)
         },
         'api_calls': {
@@ -961,9 +963,9 @@ def get_operator_users():
     persona_filter = request.args.get('persona')
     signal_type_filter = request.args.get('signal_type')
     has_consent = request.args.get('has_consent')
-    
-    # Start with all users
-    users_result = data['users'].copy()
+
+    # Start with all users from database
+    users_result = get_users_df()
     
     # Apply consent filter
     if has_consent:
@@ -1197,6 +1199,32 @@ from app_history import register_history_routes, register_session_routes
 register_history_routes(app)
 register_session_routes(app)
 
+# Catch-all route for React Router client-side routing
+# This must be registered AFTER all API routes to avoid conflicts
+@app.route('/')
+def home():
+    """Serve the frontend UI"""
+    # Serve from the configured static folder (React build or old UI)
+    return send_from_directory(static_folder, 'index.html')
+
+@app.route('/<path:path>')
+def serve_react_app(path):
+    """Catch-all route for React Router client-side routing"""
+    # Check if it's an API route (shouldn't happen if routes are ordered correctly)
+    if path.startswith('api/'):
+        # Let Flask handle API routes (will 404 if not found)
+        return jsonify({'error': 'API endpoint not found'}), 404
+    
+    # Check if it's a static asset (JS, CSS, images, etc.)
+    if '.' in path.split('/')[-1]:  # Has file extension
+        try:
+            return send_from_directory(static_folder, path)
+        except:
+            return jsonify({'error': 'File not found'}), 404
+    
+    # For all other routes, serve index.html (React Router will handle routing)
+    return send_from_directory(static_folder, 'index.html')
+
 
 if __name__ == '__main__':
     print("\n" + "="*60)
@@ -1232,4 +1260,6 @@ if __name__ == '__main__':
     print("  GET  /session/user/<user_id>   - Get user sessions")
     print("\n" + "="*60 + "\n")
 
-    app.run(debug=True, port=5000)
+    # Production: Use gunicorn or uwsgi instead
+    # Development: Use Flask's built-in server
+    app.run(debug=True, host='0.0.0.0', port=8000)

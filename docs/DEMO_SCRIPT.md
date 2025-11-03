@@ -32,7 +32,7 @@ Available endpoints: [...]
 
 ### 2. Open Browser
 
-Navigate to: `http://localhost:5000`
+Navigate to: `http://localhost:5173`
 
 ### 3. Verify Initial State
 
@@ -330,7 +330,7 @@ lsof -i :5000
 ### If Frontend Doesn't Load
 
 1. Check browser console for errors
-2. Verify Flask is running: `curl http://localhost:5000/api/health`
+2. Verify Flask is running: `curl http://localhost:8000/api/health`
 3. Try opening `ui/index.html` directly (may have CORS issues)
 4. Check that `static_folder='ui'` is set in Flask app
 
