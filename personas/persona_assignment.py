@@ -47,9 +47,9 @@ def check_high_utilization(signals):
 
     return (
         credit['max_utilization'] >= 50 or
-        credit['has_interest_charges'] or
-        credit['minimum_payment_only'] or
-        credit['is_overdue']
+        credit.get('has_interest_charges', False) or
+        credit.get('minimum_payment_only', False) or
+        credit.get('is_overdue', False)
     )
 
 
@@ -84,8 +84,8 @@ def check_savings_builder(signals):
         return False
 
     return (
-        savings['savings_growth_rate'] >= 2 or
-        savings['monthly_savings_inflow'] >= 200
+        savings.get('savings_growth_rate', 0) >= 2 or
+        savings.get('monthly_savings_inflow', 0) >= 200
     )
 
 
@@ -97,13 +97,13 @@ def check_emergency_fund_starter(signals):
 
     # Has stable income
     stable_income = (
-        income['has_payroll'] and
-        income['median_pay_gap'] <= 31 and  # Monthly or bi-weekly
-        income['pay_variability'] < 7  # Low variability
+        income.get('has_payroll', False) and
+        income.get('median_pay_gap', 999) <= 31 and  # Monthly or bi-weekly
+        income.get('pay_variability', 999) < 7  # Low variability
     )
 
     # Emergency fund coverage < 1 month
-    low_emergency_fund = savings['emergency_fund_coverage'] < 1
+    low_emergency_fund = savings.get('emergency_fund_coverage', 0) < 1
 
     # No high credit utilization issues
     no_credit_issues = (

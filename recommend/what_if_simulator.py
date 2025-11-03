@@ -45,8 +45,17 @@ class WhatIfSimulator:
             Dictionary with projection results
         """
         # Get account and liability info
-        account = self.accounts[self.accounts['account_id'] == account_id].iloc[0]
-        liability = self.liabilities[self.liabilities['account_id'] == account_id].iloc[0]
+        account_rows = self.accounts[self.accounts['account_id'] == account_id]
+        if account_rows.empty:
+            raise ValueError(f"Account {account_id} not found for user")
+        
+        account = account_rows.iloc[0]
+        
+        liability_rows = self.liabilities[self.liabilities['account_id'] == account_id]
+        if liability_rows.empty:
+            raise ValueError(f"Liability information not found for account {account_id}")
+        
+        liability = liability_rows.iloc[0]
 
         current_balance = account['balance_current']
         credit_limit = account['balance_limit']

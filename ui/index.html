@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SpendSense - Financial Education Platform</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>💰 SpendSense</h1>
+            <p>Personalized Financial Education Platform</p>
+            <div class="user-selector">
+                <label for="userSelect">Select User:</label>
+                <select id="userSelect" onchange="loadUserProfile()">
+                    <option value="">-- Select a user --</option>
+                </select>
+                <button onclick="loadUsers()" class="btn btn-secondary">Refresh Users</button>
+            </div>
+        </div>
+
+        <!-- Loading State -->
+        <div id="loading" class="loading" style="display: none;">
+            <div class="spinner"></div>
+            <p>Loading...</p>
+        </div>
+
+        <!-- Error Message -->
+        <div id="error" class="error-message" style="display: none;"></div>
+
+        <!-- Main Content (hidden until user selected) -->
+        <div id="mainContent" style="display: none;">
+            <!-- Persona Badge -->
+            <div class="card" id="personaCard">
+                <span id="personaBadge" class="persona-badge">Loading...</span>
+                <p id="personaDescription">Loading persona information...</p>
+            </div>
+
+            <!-- Key Metrics (Mint Style) -->
+            <div class="metrics-grid" id="metricsGrid"></div>
+
+            <!-- Tabs -->
+            <div class="tabs">
+                <div class="tab active" onclick="showTab('recommendations')">Recommendations</div>
+                <div class="tab" onclick="showTab('whatif')">What-If Simulator</div>
+                <div class="tab" onclick="showTab('transactions')">Transactions</div>
+                <div class="tab" onclick="showTab('operator')">Operator View</div>
+            </div>
+
+            <!-- Recommendations Tab -->
+            <div id="recommendations" class="tab-content active">
+                <h2>Personalized Recommendations</h2>
+                <div id="recommendationsList"></div>
+            </div>
+
+            <!-- What-If Simulator Tab -->
+            <div id="whatif" class="tab-content">
+                <h2>What-If Scenario Simulator</h2>
+                
+                <div class="what-if-container">
+                    <h3>Extra Debt Payment</h3>
+                    <div class="card">
+                        <div class="slider-container">
+                            <div class="slider-label">
+                                <span>Extra Monthly Payment</span>
+                                <span id="payment-value">$300</span>
+                            </div>
+                            <input type="range" min="0" max="1000" value="300" class="slider" id="payment-slider" oninput="updatePaymentSlider(this.value)">
+                        </div>
+                        <div id="debtPaymentResults"></div>
+                    </div>
+                </div>
+
+                <div class="what-if-container" style="margin-top: 2rem;">
+                    <h3>Subscription Cancellation</h3>
+                    <div class="card">
+                        <div id="subscriptionList"></div>
+                        <div id="subscriptionResults"></div>
+                    </div>
+                </div>
+
+                <div class="what-if-container" style="margin-top: 2rem;">
+                    <h3>Increased Savings</h3>
+                    <div class="card">
+                        <div class="slider-container">
+                            <div class="slider-label">
+                                <span>Monthly Savings Amount</span>
+                                <span id="savings-value">$500</span>
+                            </div>
+                            <input type="range" min="0" max="2000" value="500" class="slider" id="savings-slider" oninput="updateSavingsSlider(this.value)">
+                        </div>
+                        <div class="slider-container" style="margin-top: 1rem;">
+                            <label>Target Amount (optional):</label>
+                            <input type="number" id="target-amount" placeholder="10000" class="input-field">
+                        </div>
+                        <div id="savingsResults"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Transactions Tab -->
+            <div id="transactions" class="tab-content">
+                <h2>Recent Transactions</h2>
+                <div id="transactionsList"></div>
+                <div class="chart-container" style="margin-top: 2rem;">
+                    <h3>Spending by Category</h3>
+                    <div id="spendingChart"></div>
+                </div>
+            </div>
+
+            <!-- Operator Dashboard Tab -->
+            <div id="operator" class="tab-content">
+                <h2>Operator Dashboard</h2>
+                <div class="operator-dashboard">
+                    <div class="filter-bar">
+                        <button class="filter-button active" onclick="filterUsers('all')">All Users</button>
+                        <button class="filter-button" onclick="filterUsers('high_utilization')">High Utilization</button>
+                        <button class="filter-button" onclick="filterUsers('subscription_heavy')">Subscription-Heavy</button>
+                        <button class="filter-button" onclick="loadEvaluationReport()">Evaluation Report</button>
+                    </div>
+                    <div id="userList"></div>
+                    <div id="evaluationReport" style="margin-top: 2rem;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
+

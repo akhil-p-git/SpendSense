@@ -2,6 +2,9 @@
 Recommendation engine for SpendSense
 Generates personalized education content and partner offers with rationales
 """
+import pandas as pd
+from guardrails.eligibility import check_eligibility, filter_ineligible_offers
+from guardrails.tone import validate_recommendation, add_disclaimer
 
 EDUCATION_CONTENT = {
     'high_utilization': [
@@ -246,9 +249,9 @@ def generate_recommendation_rationale(persona_id, signals, item_title):
     """
     if persona_id == 'high_utilization':
         credit = signals['credit']
-        if credit['num_credit_cards'] > 0:
-            util = credit['max_utilization']
-            balance = credit['total_credit_balance']
+        if credit.get('has_credit_card', False):
+            util = credit.get('max_utilization', 0)
+            balance = credit.get('total_credit_balance', 0)
             return f"Your credit card utilization is at {util:.1f}% (${balance:,.2f} balance). This content can help you reduce interest charges and improve your credit score."
 
     elif persona_id == 'variable_income':
@@ -272,7 +275,7 @@ def generate_recommendation_rationale(persona_id, signals, item_title):
 
 def generate_recommendations(user_id, persona, signals, accounts_df):
     """
-    Generate personalized recommendations for a user
+    Generate personalized recommendations for a user with guardrails
 
     Args:
         user_id: User ID
@@ -297,37 +300,94 @@ def generate_recommendations(user_id, persona, signals, accounts_df):
     # Get education content for this persona
     education_items = EDUCATION_CONTENT.get(persona_id, [])[:4]  # Top 4
 
-    # Add rationales to education items
+    # Add rationales to education items and validate tone
     education_with_rationales = []
     for item in education_items:
-        education_with_rationales.append({
+        recommendation = {
             **item,
+            'type': 'education',
             'rationale': generate_recommendation_rationale(persona_id, signals, item['title'])
-        })
+        }
+        
+        # Validate and sanitize tone
+        validation = validate_recommendation(recommendation)
+        if not validation['is_valid']:
+            recommendation = validation['sanitized']
+        
+        # Add decision trace for auditability
+        recommendation['decision_trace'] = [
+            f"persona: {persona_id}",
+            f"signal: {persona_id}",
+            f"content_type: {item.get('type', 'article')}"
+        ]
+        
+        education_with_rationales.append(recommendation)
 
     # Get partner offers
     offers = PARTNER_OFFERS.get(persona_id, [])
 
-    # Filter by eligibility
+    # Filter by eligibility using guardrails
     user_accounts = accounts_df[accounts_df['user_id'] == user_id]
     eligible_offers = []
 
     for offer in offers:
-        is_eligible, reason = check_offer_eligibility(offer, signals, user_accounts)
+        # Map offer_type to product_type for eligibility check
+        product_type_map = {
+            'credit_card': 'balance_transfer_card',
+            'savings_account': 'high_yield_savings',
+            'budgeting_app': 'budgeting_app',
+            'subscription_manager': 'subscription_manager'
+        }
+        
+        product_type = product_type_map.get(offer.get('offer_type', ''), offer.get('offer_type', ''))
+        
+        # Check eligibility using guardrails module
+        is_eligible, reason = check_eligibility(user_id, product_type, signals, user_accounts)
+        
         if is_eligible:
-            eligible_offers.append({
+            recommendation = {
                 **offer,
+                'type': 'partner_offer',
+                'product_type': product_type,
                 'rationale': generate_recommendation_rationale(persona_id, signals, offer['title']),
-                'eligible': True
-            })
+                'eligibility_passed': True
+            }
+            
+            # Validate and sanitize tone
+            validation = validate_recommendation(recommendation)
+            if not validation['is_valid']:
+                recommendation = validation['sanitized']
+            
+            # Add decision trace for auditability
+            recommendation['decision_trace'] = [
+                f"persona: {persona_id}",
+                f"product_type: {product_type}",
+                f"eligibility_check: passed",
+                f"reason: {reason}"
+            ]
+            
+            eligible_offers.append(recommendation)
+
+    # Filter out any ineligible offers (additional safety check)
+    all_recommendations = education_with_rationales + eligible_offers
+    filtered_recommendations = filter_ineligible_offers(
+        all_recommendations,
+        user_id,
+        signals,
+        user_accounts
+    )
+
+    # Separate back into education and offers
+    final_education = [r for r in filtered_recommendations if r.get('type') == 'education']
+    final_offers = [r for r in filtered_recommendations if r.get('type') == 'partner_offer']
 
     return {
         'user_id': user_id,
         'persona': persona['persona_name'],
         'persona_focus': persona['primary_focus'],
-        'education': education_with_rationales,
-        'offers': eligible_offers[:3],  # Max 3 offers
-        'disclaimer': DISCLAIMER,
+        'education': final_education[:5],  # Max 5 education items
+        'offers': final_offers[:3],  # Max 3 offers
+        'disclaimer': add_disclaimer(''),
         'timestamp': pd.Timestamp.now().isoformat()
     }
 
