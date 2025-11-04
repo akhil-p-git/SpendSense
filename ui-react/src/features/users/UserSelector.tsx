@@ -54,7 +54,7 @@ export const UserSelector: React.FC = () => {
             <option value="">-- Select a user --</option>
             {usersData?.users.map((user) => (
               <option key={user.user_id} value={user.user_id}>
-                {user.name} ({user.user_id})
+                {user.name}
               </option>
             ))}
           </select>
