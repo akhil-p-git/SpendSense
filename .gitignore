@@ -96,7 +96,7 @@ ui/designs/
 
 # React frontend
 ui-react/node_modules/
-ui-react/dist/
+# ui-react/dist/ - Committed for Railway deployment
 ui-react/.vite/
 ui-react/.env
 ui-react/.env.local
