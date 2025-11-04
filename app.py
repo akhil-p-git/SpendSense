@@ -68,33 +68,69 @@ def after_request(response):
     response.headers.add('Access-Control-Max-Age', '3600')
     return response
 
-# Initialize database
-print("Initializing SpendSense...")
-init_db()
+# Lazy initialization flag
+_db_initialized = False
+_data_loaded = False
 
-# Load or generate data
-if check_db_exists():
-    # Check if database has data
+def ensure_db_initialized():
+    """Lazy initialization of database - only runs when needed"""
+    global _db_initialized
+    if _db_initialized:
+        return
+    
     try:
-        users_df = get_users_df()
-        if len(users_df) == 0:
-            print("Database exists but is empty, generating data...")
+        print("Initializing SpendSense database...")
+        init_db()
+        _db_initialized = True
+        print("✓ Database initialized")
+    except Exception as e:
+        print(f"⚠ Warning: Database initialization failed: {e}")
+        # In serverless, this might be expected if /tmp is not available
+        # We'll let individual endpoints handle missing database gracefully
+        _db_initialized = False
+
+def ensure_data_loaded():
+    """Lazy loading of data - only runs when needed and DB is initialized"""
+    global _data_loaded, _db_initialized
+    
+    if _data_loaded:
+        return
+    
+    # Ensure DB is initialized first
+    ensure_db_initialized()
+    
+    if not _db_initialized:
+        # Can't load data if DB init failed
+        return
+    
+    try:
+        # Check if database has data
+        if check_db_exists():
+            users_df = get_users_df()
+            if len(users_df) == 0:
+                print("Database exists but is empty, generating data...")
+                generate_synthetic_data(num_users=75, save_to_db=True)
+                print("✓ Data generated and loaded into database")
+            else:
+                print(f"✓ Database loaded with {len(users_df)} users")
+            _data_loaded = True
+        else:
+            print("Database not found, generating new data...")
             generate_synthetic_data(num_users=75, save_to_db=True)
             print("✓ Data generated and loaded into database")
-        else:
-            print(f"✓ Database loaded with {len(users_df)} users")
+            _data_loaded = True
     except Exception as e:
-        print(f"Error loading from database: {e}, generating new data...")
-        generate_synthetic_data(num_users=75, save_to_db=True)
-        print("✓ Data generated and loaded into database")
-else:
-    print("Generating new data...")
-    generate_synthetic_data(num_users=75, save_to_db=True)
-    print("✓ Data generated and loaded into database")
+        print(f"⚠ Warning: Data loading failed: {e}")
+        # Don't set _data_loaded = True if we failed
+        # Individual endpoints can handle this gracefully
 
 # Helper function to get data (compatibility with existing code)
 def get_data():
     """Get data from database as DataFrames"""
+    # Ensure database and data are initialized before accessing
+    ensure_data_loaded()
+    if not _db_initialized:
+        raise RuntimeError('Database not initialized')
     return get_all_data()
 
 # Track app start time for uptime calculation
@@ -106,13 +142,21 @@ timings_history = []
 
 @app.route('/api/health', methods=['GET', 'OPTIONS'])
 def health():
-    """Health check endpoint"""
+    """Health check endpoint - lightweight, doesn't trigger data generation"""
     if request.method == 'OPTIONS':
         return '', 200
+    
+    # Just check if DB can be initialized, don't load data
+    try:
+        ensure_db_initialized()
+        db_status = 'initialized' if _db_initialized else 'failed'
+    except Exception as e:
+        db_status = f'error: {str(e)}'
     
     return jsonify({
         'status': 'ok',
         'message': 'SpendSense API is running',
+        'database': db_status,
         'endpoints': {
             'GET /users': 'List all users',
             'GET /profile/<user_id>': 'Get user behavioral profile',
@@ -127,6 +171,11 @@ def list_users():
     """List all users with consent status"""
     if request.method == 'OPTIONS':
         return '', 200
+    
+    # Ensure database and data are initialized
+    ensure_data_loaded()
+    if not _db_initialized:
+        return jsonify({'error': 'Database initialization failed'}), 503
     
     users_list = User.get_all()
     users = [
@@ -151,6 +200,11 @@ def get_profile(user_id):
 
     Returns signals, persona assignment, and rationale
     """
+    # Ensure database and data are initialized
+    ensure_data_loaded()
+    if not _db_initialized:
+        return jsonify({'error': 'Database initialization failed'}), 503
+    
     # Check if user exists
     user = User.get(user_id)
     if not user:
