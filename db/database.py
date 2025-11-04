@@ -7,12 +7,40 @@ import os
 from contextlib import contextmanager
 from datetime import datetime
 
-DB_PATH = os.getenv('SPENDSENSE_DB_PATH', 'data/spendsense.db')
+# Detect if we're in a serverless environment (Vercel, AWS Lambda, etc.)
+# Serverless environments typically have these characteristics:
+# - VERCEL environment variable is set
+# - Filesystem is read-only except /tmp
+# - We should use /tmp for SQLite database
+def is_serverless():
+    """Check if running in serverless environment"""
+    return os.getenv('VERCEL') is not None or os.getenv('AWS_LAMBDA_FUNCTION_NAME') is not None
+
+# Determine database path based on environment
+if is_serverless():
+    # In serverless, use /tmp which is writable but ephemeral
+    DEFAULT_DB_PATH = '/tmp/spendsense.db'
+else:
+    # In traditional deployment, use data directory
+    DEFAULT_DB_PATH = 'data/spendsense.db'
+
+DB_PATH = os.getenv('SPENDSENSE_DB_PATH', DEFAULT_DB_PATH)
 
 
 def get_db_path():
     """Get the database path, creating directory if needed"""
-    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+    global DB_PATH
+    db_dir = os.path.dirname(DB_PATH)
+    # Only create directory if it's not /tmp and doesn't exist
+    if db_dir and db_dir != '/tmp' and not os.path.exists(db_dir):
+        try:
+            os.makedirs(db_dir, exist_ok=True)
+        except (OSError, PermissionError) as e:
+            # If we can't create directory (e.g., read-only filesystem),
+            # fall back to /tmp
+            if is_serverless() or not os.path.exists('/tmp'):
+                raise
+            DB_PATH = '/tmp/spendsense.db'
     return DB_PATH
 
 
