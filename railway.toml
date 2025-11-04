@@ -1,6 +1,8 @@
 [build]
 builder = "NIXPACKS"
+buildCommand = "cd ui-react && npm install && npm run build && cd .. && pip install --break-system-packages -r requirements.txt"
 
 [deploy]
+startCommand = "gunicorn app:app --bind 0.0.0.0:$PORT --workers 2 --timeout 120"
 healthcheckPath = "/"
 healthcheckTimeout = 100
