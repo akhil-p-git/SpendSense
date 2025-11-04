@@ -22,6 +22,11 @@ export const EducationalGuide: React.FC<EducationalGuideProps> = ({
 }) => {
   return (
     <div className="space-y-6">
+      {/* Title */}
+      {title && (
+        <h2 className="text-2xl font-bold text-gray-900">{title}</h2>
+      )}
+
       {/* Main Content */}
       <div className="prose max-w-none">
         <div className="text-gray-700 leading-relaxed whitespace-pre-line">{content}</div>
