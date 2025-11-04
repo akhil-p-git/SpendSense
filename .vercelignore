@@ -8,7 +8,8 @@ __pycache__/
 *.so
 *.egg-info/
 .eggs/
-dist/
+# Don't exclude ui-react/dist - we need it for deployment
+# dist/
 build/
 
 # Node
