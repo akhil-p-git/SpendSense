@@ -71,13 +71,21 @@ def after_request(response):
 # Lazy initialization flag
 _db_initialized = False
 _data_loaded = False
+_is_serverless = os.environ.get('SERVERLESS') == '1'
 
 def ensure_db_initialized():
     """Lazy initialization of database - only runs when needed"""
     global _db_initialized
+
     if _db_initialized:
         return
-    
+
+    # Skip database initialization in serverless environment
+    if _is_serverless:
+        print("⚠ Running in serverless mode - database operations disabled")
+        _db_initialized = False
+        return
+
     try:
         print("Initializing SpendSense database...")
         init_db()
@@ -85,8 +93,6 @@ def ensure_db_initialized():
         print("✓ Database initialized")
     except Exception as e:
         print(f"⚠ Warning: Database initialization failed: {e}")
-        # In serverless, this might be expected if /tmp is not available
-        # We'll let individual endpoints handle missing database gracefully
         _db_initialized = False
 
 def ensure_data_loaded():
@@ -145,25 +151,30 @@ def health():
     """Health check endpoint - lightweight, doesn't trigger data generation"""
     if request.method == 'OPTIONS':
         return '', 200
-    
-    # Just check if DB can be initialized, don't load data
-    try:
-        ensure_db_initialized()
-        db_status = 'initialized' if _db_initialized else 'failed'
-    except Exception as e:
-        db_status = f'error: {str(e)}'
-    
-    return jsonify({
+
+    response_data = {
         'status': 'ok',
         'message': 'SpendSense API is running',
-        'database': db_status,
+        'environment': 'serverless' if _is_serverless else 'local',
         'endpoints': {
             'GET /users': 'List all users',
             'GET /profile/<user_id>': 'Get user behavioral profile',
             'GET /recommendations/<user_id>': 'Get personalized recommendations',
             'POST /what-if': 'Run what-if scenario simulation'
         }
-    })
+    }
+
+    if _is_serverless:
+        response_data['note'] = 'Database operations are disabled in serverless mode. Please use a cloud database for production.'
+    else:
+        # Only check DB status in non-serverless mode
+        try:
+            ensure_db_initialized()
+            response_data['database'] = 'initialized' if _db_initialized else 'failed'
+        except Exception as e:
+            response_data['database'] = f'error: {str(e)}'
+
+    return jsonify(response_data)
 
 
 @app.route('/users', methods=['GET', 'OPTIONS'])
@@ -171,12 +182,20 @@ def list_users():
     """List all users with consent status"""
     if request.method == 'OPTIONS':
         return '', 200
-    
+
+    # In serverless mode, return helpful message
+    if _is_serverless:
+        return jsonify({
+            'error': 'Database not available in serverless mode',
+            'message': 'This endpoint requires a persistent database. Please configure a cloud database (PostgreSQL, MySQL, etc.) for production use.',
+            'alternative': 'For demo purposes, you can run this locally with: python app.py'
+        }), 503
+
     # Ensure database and data are initialized
     ensure_data_loaded()
     if not _db_initialized:
         return jsonify({'error': 'Database initialization failed'}), 503
-    
+
     users_list = User.get_all()
     users = [
         {
