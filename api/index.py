@@ -10,10 +10,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app import app
 
-# Vercel serverless function handler
-def handler(request, context):
-    """Handle incoming requests in Vercel's serverless environment"""
-    return app(request.environ, context)
-
-# For compatibility
+# Vercel expects the WSGI application to be exposed as 'handler' or 'application'
+# Flask app is WSGI-compatible, so we can expose it directly
+handler = app
 application = app
