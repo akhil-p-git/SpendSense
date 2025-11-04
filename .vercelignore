@@ -6,10 +6,17 @@ __pycache__/
 *.pyd
 .Python
 *.so
+*.egg-info/
+.eggs/
+dist/
+build/
 
 # Node
 ui-react/node_modules/
 ui-react/.vite/
+ui-react/src/
+ui-react/public/
+node_modules/
 
 # IDE
 .vscode/
@@ -29,12 +36,31 @@ Thumbs.db
 tests/
 *.test.py
 .pytest_cache/
+pytest.ini
+.coverage
+htmlcov/
 
 # Docs
 docs/
 *.md
 !README.md
+PRD.md
 
 # Local dev
 *.log
 .env.local
+.env.development
+
+# Development dependencies
+requirements-dev.txt
+
+# Database files (if using SQLite locally)
+*.db
+*.sqlite
+*.sqlite3
+
+# Large data files
+data/
+*.parquet
+*.csv
+*.json.gz
