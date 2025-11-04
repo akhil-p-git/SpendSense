@@ -53,6 +53,9 @@ export const Layout: React.FC = () => {
       } else if (tabId === 'transactions') {
         navigate(`/users/${currentUserId}/transactions`);
       }
+    } else {
+      // No user selected - navigate to home to show user selection prompt
+      navigate('/');
     }
   };
 

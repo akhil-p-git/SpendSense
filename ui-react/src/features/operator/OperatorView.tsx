@@ -10,6 +10,7 @@ import {
   SystemHealthCard,
   OperatorFilters,
   OperatorUserList,
+  ExportPDFButton,
 } from '@/components/operator';
 
 export const OperatorView: React.FC = () => {
@@ -21,7 +22,10 @@ export const OperatorView: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-bold text-gray-900">Operator Dashboard</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold text-gray-900">Operator Dashboard</h2>
+        <ExportPDFButton />
+      </div>
 
       {/* Analytics Cards Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

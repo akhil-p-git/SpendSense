@@ -29,7 +29,7 @@ from eval.metrics import (
 )
 
 # Database imports
-from db.database import init_db, check_db_exists
+from db.database import init_db, check_db_exists, get_db_connection
 from db.utils import get_all_data, get_users_df, get_user_transactions_df, get_user_accounts_df, get_user_liabilities_df
 from db.models import (
     User, Account, Transaction, Liability,
@@ -780,11 +780,17 @@ def save_evaluation():
         # Get recommendations from database
         recommendations_list = []
         recs_df = pd.read_sql_query('SELECT * FROM recommendations', conn)
-        for _, rec in recs_df.iterrows():
-            recommendations_list.append({
-                'rationale': rec.get('rationale'),
-                'decision_trace': json.loads(rec.get('decision_trace') or '[]')
-            })
+        if not recs_df.empty:
+            for _, rec in recs_df.iterrows():
+                try:
+                    recommendations_list.append({
+                        'rationale': rec.get('rationale') or '',
+                        'decision_trace': json.loads(rec.get('decision_trace') or '[]')
+                    })
+                except (json.JSONDecodeError, TypeError) as e:
+                    # Skip invalid recommendation entries
+                    print(f"Warning: Skipping invalid recommendation entry: {e}")
+                    continue
     
     # Get users data
     users_df = get_users_df()
@@ -1202,7 +1208,7 @@ def get_system_health():
     })
 
 
-@app.route('/operator/eval/export-pdf', methods=['GET'])
+@app.route('/operator/eval/export-pdf', methods=['GET', 'OPTIONS'])
 def export_evaluation_pdf():
     """
     Export evaluation report as PDF
@@ -1212,6 +1218,9 @@ def export_evaluation_pdf():
     
     Returns PDF file download
     """
+    if request.method == 'OPTIONS':
+        return '', 200
+    
     # Check operator access (for production: implement proper auth)
     if not check_operator_access():
         return jsonify({'error': 'Access denied. Operator role required.'}), 403
@@ -1239,11 +1248,17 @@ def export_evaluation_pdf():
             # Get recommendations from database
             recommendations_list = []
             recs_df = pd.read_sql_query('SELECT * FROM recommendations', conn)
-            for _, rec in recs_df.iterrows():
-                recommendations_list.append({
-                    'rationale': rec.get('rationale'),
-                    'decision_trace': json.loads(rec.get('decision_trace') or '[]')
-                })
+            if not recs_df.empty:
+                for _, rec in recs_df.iterrows():
+                    try:
+                        recommendations_list.append({
+                            'rationale': rec.get('rationale') or '',
+                            'decision_trace': json.loads(rec.get('decision_trace') or '[]')
+                        })
+                    except (json.JSONDecodeError, TypeError) as e:
+                        # Skip invalid recommendation entries
+                        print(f"Warning: Skipping invalid recommendation entry: {e}")
+                        continue
         
         # Get users data
         users_df = get_users_df()
@@ -1342,8 +1357,16 @@ def export_evaluation_pdf():
         ]))
         story.append(latency_table)
         
-        # Build PDF
-        doc.build(story)
+        # Function to set PDF metadata on first page
+        def on_first_page(canvas, doc):
+            """Set PDF document metadata"""
+            canvas.setTitle("SpendSense Evaluation Report")
+            canvas.setAuthor("SpendSense Platform")
+            canvas.setSubject("Financial Education Evaluation Metrics")
+            canvas.setKeywords("SpendSense, Financial Education, Evaluation, Metrics, Analytics")
+        
+        # Build PDF with metadata callback
+        doc.build(story, onFirstPage=on_first_page)
         buffer.seek(0)
         
         from flask import Response
@@ -1355,9 +1378,14 @@ def export_evaluation_pdf():
             }
         )
         
-    except ImportError:
+    except ImportError as e:
+        print(f"ERROR: ReportLab not installed: {e}")
         return jsonify({'error': 'reportlab not installed. Run: pip install reportlab'}), 500
     except Exception as e:
+        import traceback
+        error_trace = traceback.format_exc()
+        print(f"ERROR: PDF generation failed: {str(e)}")
+        print(f"Traceback: {error_trace}")
         return jsonify({'error': f'PDF generation failed: {str(e)}'}), 500
 
 
