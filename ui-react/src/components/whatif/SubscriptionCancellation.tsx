@@ -3,7 +3,7 @@
  * Simulates canceling subscriptions
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useWhatIfScenario } from '@/hooks/useApi';
 import { useStore } from '@/store/useStore';
 import { useProfile } from '@/hooks/useApi';
@@ -46,13 +46,47 @@ export const SubscriptionCancellation: React.FC = () => {
   }, [profile]);
 
   const [selectedSubscriptions, setSelectedSubscriptions] = useState<Set<string>>(new Set());
+  const lastSelectedRef = useRef<string>(''); // Track last selected set to prevent duplicate calls
+  const simulationTimeoutRef = useRef<number | null>(null);
 
-  // Run simulation when selections change
+  // Run simulation when selections change (with debouncing)
   useEffect(() => {
-    if (currentUserId && selectedSubscriptions.size > 0) {
+    // Clear any pending simulation
+    if (simulationTimeoutRef.current) {
+      clearTimeout(simulationTimeoutRef.current);
+      simulationTimeoutRef.current = null;
+    }
+
+    // Don't run if no user, no selections, or mutation is already pending
+    if (!currentUserId || selectedSubscriptions.size === 0 || whatIfScenario.isPending) {
+      // Reset ref when no selections
+      if (selectedSubscriptions.size === 0) {
+        lastSelectedRef.current = '';
+      }
+      return;
+    }
+
+    // Create a stable string representation of the selection
+    const selectionKey = Array.from(selectedSubscriptions).sort().join(',');
+
+    // Prevent duplicate calls with the same selection
+    if (lastSelectedRef.current === selectionKey) {
+      return;
+    }
+
+    // Debounce the simulation call to prevent rapid-fire requests
+    simulationTimeoutRef.current = setTimeout(() => {
+      // Check again if we should run (user might have deselected everything or mutation started)
+      if (selectedSubscriptions.size === 0 || !currentUserId || whatIfScenario.isPending) {
+        return;
+      }
+
       const subscriptionsToCancel = subscriptions
         .filter(sub => selectedSubscriptions.has(sub.name))
         .map(sub => ({ name: sub.name, amount: sub.amount }));
+
+      // Update the ref before calling mutate
+      lastSelectedRef.current = selectionKey;
 
       whatIfScenario.mutate({
         userId: currentUserId,
@@ -64,9 +98,16 @@ export const SubscriptionCancellation: React.FC = () => {
           },
         },
       });
-    }
+    }, 300); // 300ms debounce
+
+    // Cleanup function
+    return () => {
+      if (simulationTimeoutRef.current) {
+        clearTimeout(simulationTimeoutRef.current);
+      }
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentUserId, selectedSubscriptions, subscriptions]);
+  }, [currentUserId, selectedSubscriptions]);
 
   const handleToggleSubscription = (name: string) => {
     setSelectedSubscriptions(prev => {

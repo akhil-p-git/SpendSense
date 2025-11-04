@@ -18,7 +18,10 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({ scenarioResult }) 
   const exportScenario = useExportScenario();
 
   const handleExport = async (format: 'pdf' | 'json') => {
-    if (!scenarioResult || !currentUserId) return;
+    // Prevent multiple simultaneous export calls
+    if (!scenarioResult || !currentUserId || exportScenario.isPending) {
+      return;
+    }
 
     try {
       const blob = await exportScenario.mutateAsync({
@@ -37,7 +40,11 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({ scenarioResult }) 
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
     } catch (error) {
-      console.error('Export failed:', error);
+      // Only log error once, don't spam console
+      if (!(error as any)?.__handled) {
+        console.error('Export failed:', error);
+        (error as any).__handled = true;
+      }
       alert(`Failed to export ${format.toUpperCase()}: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };

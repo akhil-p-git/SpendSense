@@ -49,12 +49,23 @@ class ApiService {
       async (error: AxiosError) => {
         const config = error.config as any;
         
-        // Don't retry if already retried or if it's not a network error
-        if (!config || config.__retryCount >= 3) {
-          return Promise.reject(error);
+        // Don't retry export endpoints - they're likely to fail due to missing dependencies
+        const isExportEndpoint = config?.url?.includes('/export') || config?.url?.includes('/eval/export');
+        
+        // Don't retry if already retried, if it's an export endpoint, or if max retries reached
+        if (!config || config.__retryCount >= 3 || isExportEndpoint) {
+          // Handle errors without retrying
+          if (error.response) {
+            const message = (error.response.data as any)?.error || error.message;
+            return Promise.reject(new Error(message));
+          } else if (error.request) {
+            return Promise.reject(new Error('No response from server'));
+          } else {
+            return Promise.reject(error);
+          }
         }
 
-        // Only retry on network errors or 5xx errors
+        // Only retry on network errors or 5xx errors (but not for exports)
         if (
           !error.response ||
           (error.response.status >= 500 && error.response.status < 600)
