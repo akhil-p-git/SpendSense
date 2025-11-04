@@ -18,11 +18,5 @@
       "dest": "ui-react/dist/index.html"
     }
   ],
-  "outputDirectory": "ui-react/dist",
-  "functions": {
-    "api/**/*.py": {
-      "maxDuration": 30,
-      "memory": 1024
-    }
-  }
+  "outputDirectory": "ui-react/dist"
 }
