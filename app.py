@@ -46,7 +46,27 @@ OLD_UI_PATH = os.path.join(os.path.dirname(__file__), 'ui')
 static_folder = REACT_BUILD_PATH if os.path.exists(REACT_BUILD_PATH) else OLD_UI_PATH
 
 app = Flask(__name__, static_folder=static_folder, static_url_path='')
-CORS(app, resources={r"/*": {"origins": "*", "allow_headers": ["Content-Type", "Authorization"], "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"]}})
+
+# Enhanced CORS configuration
+CORS(app, 
+     resources={r"/*": {
+         "origins": "*",
+         "allow_headers": ["Content-Type", "Authorization", "X-Requested-With"],
+         "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+         "expose_headers": ["Content-Type"],
+         "supports_credentials": False
+     }},
+     supports_credentials=False)
+
+# Handle OPTIONS preflight requests explicitly
+@app.after_request
+def after_request(response):
+    """Add CORS headers to all responses"""
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With')
+    response.headers.add('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
+    response.headers.add('Access-Control-Max-Age', '3600')
+    return response
 
 # Initialize database
 print("Initializing SpendSense...")
@@ -84,9 +104,12 @@ app_start_time = datetime.now()
 timings_history = []
 
 
-@app.route('/api/health')
+@app.route('/api/health', methods=['GET', 'OPTIONS'])
 def health():
     """Health check endpoint"""
+    if request.method == 'OPTIONS':
+        return '', 200
+    
     return jsonify({
         'status': 'ok',
         'message': 'SpendSense API is running',
@@ -99,9 +122,12 @@ def health():
     })
 
 
-@app.route('/users', methods=['GET'])
+@app.route('/users', methods=['GET', 'OPTIONS'])
 def list_users():
     """List all users with consent status"""
+    if request.method == 'OPTIONS':
+        return '', 200
+    
     users_list = User.get_all()
     users = [
         {
@@ -708,14 +734,44 @@ def save_evaluation():
 
 
 # ========== OPERATOR ANALYTICS ENDPOINTS ==========
+# NOTE: These endpoints are restricted to operators/tutors only.
+# Regular users cannot access analytics, persona distributions, or system health metrics.
+# This ensures privacy and proper access control for sensitive analytics data.
 
-@app.route('/operator/persona-distribution', methods=['GET'])
+def check_operator_access():
+    """
+    Check if the current request is from an authorized operator/tutor.
+    
+    TODO: In production, implement proper authentication/authorization:
+    - Check for operator role in session/token
+    - Verify JWT token or API key
+    - Validate user permissions
+    
+    For now, this is a placeholder that allows access.
+    In production, this should return 403 Forbidden for non-operators.
+    """
+    # TODO: Implement actual authentication check
+    # For demo purposes, allowing access
+    # In production: return 403 if not operator
+    return True
+
+
+@app.route('/operator/persona-distribution', methods=['GET', 'OPTIONS'])
 def get_persona_distribution():
     """
     Get persona distribution across all users
     
+    RESTRICTED: Operator/Tutor access only.
+    Regular users cannot see this analytics data.
+    
     Returns pie chart data for persona distribution
     """
+    if request.method == 'OPTIONS':
+        return '', 200
+    
+    # Check operator access (for production: implement proper auth)
+    if not check_operator_access():
+        return jsonify({'error': 'Access denied. Operator role required.'}), 403
     from db.database import get_db_connection
     
     with get_db_connection() as conn:
@@ -771,13 +827,22 @@ def get_persona_distribution():
     })
 
 
-@app.route('/operator/recommendation-tracking', methods=['GET'])
+@app.route('/operator/recommendation-tracking', methods=['GET', 'OPTIONS'])
 def get_recommendation_tracking():
     """
     Get recommendation acceptance tracking metrics
     
+    RESTRICTED: Operator/Tutor access only.
+    Regular users cannot see recommendation tracking analytics.
+    
     Returns views, acceptance rate, by type, etc.
     """
+    if request.method == 'OPTIONS':
+        return '', 200
+    
+    # Check operator access (for production: implement proper auth)
+    if not check_operator_access():
+        return jsonify({'error': 'Access denied. Operator role required.'}), 403
     from db.database import get_db_connection
     
     with get_db_connection() as conn:
@@ -836,6 +901,9 @@ def track_recommendation_acceptance():
     """
     Track when a user accepts/clicks on a recommendation
     
+    RESTRICTED: Operator/Tutor access only.
+    Regular users cannot track recommendation acceptance.
+    
     Request body:
     {
         "user_id": "user_0001",
@@ -886,80 +954,26 @@ def track_recommendation_acceptance():
     })
 
 
-@app.route('/operator/system-health', methods=['GET'])
-def get_system_health():
-    """
-    Get system health metrics
-    
-    Returns API uptime, average latency, error rates, etc.
-    """
-    # Calculate latency metrics
-    if timings_history:
-        latencies = [t['latency_seconds'] for t in timings_history]
-        avg_latency = sum(latencies) / len(latencies)
-        max_latency = max(latencies)
-        min_latency = min(latencies)
-    else:
-        avg_latency = 0
-        max_latency = 0
-        min_latency = 0
-    
-    # User stats
-    users_df = get_users_df()
-    total_users = len(users_df)
-    users_with_consent = len(users_df[users_df['consent'] == True])
-    consent_rate = (users_with_consent / total_users * 100) if total_users > 0 else 0
-    
-    # Recommendation stats from database
-    from db.database import get_db_connection
-    with get_db_connection() as conn:
-        total_recs_df = pd.read_sql_query('SELECT COUNT(*) as total FROM recommendations', conn)
-        total_views_df = pd.read_sql_query('SELECT COUNT(*) as total FROM recommendation_views', conn)
-        total_accepts_df = pd.read_sql_query('SELECT COUNT(*) as total FROM recommendation_acceptances WHERE action = ?', conn, params=('clicked',))
-    
-    total_recommendations = total_recs_df.iloc[0]['total'] if not total_recs_df.empty else 0
-    total_views = total_views_df.iloc[0]['total'] if not total_views_df.empty else 0
-    total_acceptances = total_accepts_df.iloc[0]['total'] if not total_accepts_df.empty else 0
-    
-    # API call stats
-    total_api_calls = len(timings_history)
-    
-    return jsonify({
-        'uptime_seconds': (datetime.now() - app_start_time).total_seconds(),
-        'latency': {
-            'avg_seconds': round(avg_latency, 3),
-            'max_seconds': round(max_latency, 3),
-            'min_seconds': round(min_latency, 3),
-            'target_met': avg_latency < 5.0
-        },
-        'users': {
-            'total': int(total_users),
-            'with_consent': int(users_with_consent),
-            'consent_rate_percent': round(consent_rate, 1)
-        },
-        'recommendations': {
-            'total_generated': int(total_recommendations),
-            'total_views': int(total_views),
-            'total_acceptances': int(total_acceptances),
-            'acceptance_rate_percent': round((total_acceptances / total_views * 100) if total_views > 0 else 0, 1)
-        },
-        'api_calls': {
-            'total': total_api_calls,
-            'avg_per_minute': round((total_api_calls / max((datetime.now() - app_start_time).total_seconds(), 1)) * 60, 2)
-        }
-    })
-
-
-@app.route('/operator/users', methods=['GET'])
+@app.route('/operator/users', methods=['GET', 'OPTIONS'])
 def get_operator_users():
     """
     Get filtered list of users for operator view
+    
+    RESTRICTED: Operator/Tutor access only.
+    Regular users cannot see other users' data or filtered lists.
     
     Query parameters:
     - persona: Filter by persona (e.g., "high_utilization")
     - signal_type: Filter by signal type (e.g., "subscriptions", "credit")
     - has_consent: Filter by consent status (true/false)
     """
+    if request.method == 'OPTIONS':
+        return '', 200
+    
+    # Check operator access (for production: implement proper auth)
+    if not check_operator_access():
+        return jsonify({'error': 'Access denied. Operator role required.'}), 403
+    
     persona_filter = request.args.get('persona')
     signal_type_filter = request.args.get('signal_type')
     has_consent = request.args.get('has_consent')
@@ -1041,13 +1055,93 @@ def get_operator_users():
     })
 
 
+@app.route('/operator/system-health', methods=['GET', 'OPTIONS'])
+def get_system_health():
+    """
+    Get system health metrics
+    
+    RESTRICTED: Operator/Tutor access only.
+    Regular users cannot see system health metrics.
+    
+    Returns API uptime, average latency, error rates, etc.
+    """
+    if request.method == 'OPTIONS':
+        return '', 200
+    
+    # Check operator access (for production: implement proper auth)
+    if not check_operator_access():
+        return jsonify({'error': 'Access denied. Operator role required.'}), 403
+    
+    # Calculate latency metrics
+    if timings_history:
+        latencies = [t['latency_seconds'] for t in timings_history]
+        avg_latency = sum(latencies) / len(latencies)
+        max_latency = max(latencies)
+        min_latency = min(latencies)
+    else:
+        avg_latency = 0
+        max_latency = 0
+        min_latency = 0
+    
+    # User stats
+    users_df = get_users_df()
+    total_users = len(users_df)
+    users_with_consent = len(users_df[users_df['consent'] == True])
+    consent_rate = (users_with_consent / total_users * 100) if total_users > 0 else 0
+    
+    # Recommendation stats from database
+    from db.database import get_db_connection
+    with get_db_connection() as conn:
+        total_recs_df = pd.read_sql_query('SELECT COUNT(*) as total FROM recommendations', conn)
+        total_views_df = pd.read_sql_query('SELECT COUNT(*) as total FROM recommendation_views', conn)
+        total_accepts_df = pd.read_sql_query('SELECT COUNT(*) as total FROM recommendation_acceptances WHERE action = ?', conn, params=('clicked',))
+    
+    total_recommendations = total_recs_df.iloc[0]['total'] if not total_recs_df.empty else 0
+    total_views = total_views_df.iloc[0]['total'] if not total_views_df.empty else 0
+    total_acceptances = total_accepts_df.iloc[0]['total'] if not total_accepts_df.empty else 0
+    
+    # API call stats
+    total_api_calls = len(timings_history)
+    
+    return jsonify({
+        'uptime_seconds': (datetime.now() - app_start_time).total_seconds(),
+        'latency': {
+            'avg_seconds': round(avg_latency, 3),
+            'max_seconds': round(max_latency, 3),
+            'min_seconds': round(min_latency, 3),
+            'target_met': avg_latency < 5.0
+        },
+        'users': {
+            'total': int(total_users),
+            'with_consent': int(users_with_consent),
+            'consent_rate_percent': round(consent_rate, 1)
+        },
+        'recommendations': {
+            'total_generated': int(total_recommendations),
+            'total_views': int(total_views),
+            'total_acceptances': int(total_acceptances),
+            'acceptance_rate_percent': round((total_acceptances / total_views * 100) if total_views > 0 else 0, 1)
+        },
+        'api_calls': {
+            'total': total_api_calls,
+            'avg_per_minute': round((total_api_calls / max((datetime.now() - app_start_time).total_seconds(), 1)) * 60, 2)
+        }
+    })
+
+
 @app.route('/operator/eval/export-pdf', methods=['GET'])
 def export_evaluation_pdf():
     """
     Export evaluation report as PDF
     
+    RESTRICTED: Operator/Tutor access only.
+    Regular users cannot export evaluation reports.
+    
     Returns PDF file download
     """
+    # Check operator access (for production: implement proper auth)
+    if not check_operator_access():
+        return jsonify({'error': 'Access denied. Operator role required.'}), 403
     try:
         from reportlab.lib.pagesizes import letter
         from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle

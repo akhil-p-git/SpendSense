@@ -1,6 +1,6 @@
 # SpendSense - Financial Education Platform
 
-> Transform transaction data into personalized financial education with explainable AI and consent-driven guardrails.
+> Transform transaction data into personalized financial education with explainable, rules-based logic and consent-driven guardrails.
 
 ## 🎯 Overview
 
@@ -375,7 +375,7 @@ This is a demonstration project for Peak6 interview process.
 
 - Peak6 for the project specification
 - Plaid for API inspiration
-- Anthropic's Claude for development assistance
+- Anthropic's Claude for development assistance (AI was used as a coding tool, not in the application itself)
 
 ## 📞 Contact
 

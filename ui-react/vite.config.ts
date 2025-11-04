@@ -12,13 +12,22 @@ export default defineConfig({
   },
   server: {
     port: 5173,
-      proxy: {
-        '/api': {
-          target: 'http://localhost:8000',
-          changeOrigin: true,
-          rewrite: (path) => path.replace(/^\/api/, ''),
-        },
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api/, ''),
       },
+    },
   },
+  build: {
+    sourcemap: true, // Generate source maps for production builds
+  },
+  // Suppress source map warnings for dependencies
+  optimizeDeps: {
+    include: ['react', 'react-dom', 'react-router-dom'],
+  },
+  // Suppress console warnings about source maps
+  logLevel: 'warn', // Reduces console noise from source map warnings
 })
 

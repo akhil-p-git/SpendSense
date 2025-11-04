@@ -1,0 +1,40 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+
+# Node
+ui-react/node_modules/
+ui-react/.vite/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Tests
+tests/
+*.test.py
+.pytest_cache/
+
+# Docs
+docs/
+*.md
+!README.md
+
+# Local dev
+*.log
+.env.local
