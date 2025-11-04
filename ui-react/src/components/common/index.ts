@@ -5,4 +5,5 @@ export { ErrorMessage } from './ErrorMessage';
 export { ErrorBoundary } from './ErrorBoundary';
 export { ToastContainer } from './Toast';
 export { ConfirmationModal } from './ConfirmationModal';
+export { Modal } from './Modal';
 

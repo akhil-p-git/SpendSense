@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import { useRecommendations, useTrackRecommendationAcceptance } from '@/hooks/useApi';
+import { useRecommendations, useTrackRecommendationAcceptance, useProfile } from '@/hooks/useApi';
 import { useStore } from '@/store/useStore';
 import { RecommendationCard } from '@/components/recommendations/RecommendationCard';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
@@ -14,6 +14,7 @@ import { Card } from '@/components/common/Card';
 export const RecommendationsView: React.FC = () => {
   const { currentUserId } = useStore();
   const { data: recommendations, isLoading, error } = useRecommendations(currentUserId);
+  const { data: profile } = useProfile(currentUserId);
   const trackAcceptance = useTrackRecommendationAcceptance();
 
   const handleTrackClick = (recommendationId: string, type: string) => {
@@ -108,6 +109,7 @@ export const RecommendationsView: React.FC = () => {
                 recommendation={rec}
                 onTrackClick={handleTrackClick}
                 userId={currentUserId}
+                userSignals={profile?.signals}
               />
             ))}
           </div>
@@ -130,6 +132,7 @@ export const RecommendationsView: React.FC = () => {
                 recommendation={rec}
                 onTrackClick={handleTrackClick}
                 userId={currentUserId}
+                userSignals={profile?.signals}
               />
             ))}
           </div>
