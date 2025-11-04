@@ -8,21 +8,16 @@
   ],
   "routes": [
     {
+      "src": "/api/(.*)",
+      "dest": "api/index.py"
+    },
+    {
       "src": "/(users|recommendations|profile|consent|what-if|operator|eval|history|session|transactions)/(.*)",
       "dest": "api/index.py"
     },
     {
-      "src": "/assets/(.*)",
-      "dest": "ui-react/dist/assets/$1"
-    },
-    {
-      "src": "/(.*\\..+)",
-      "dest": "ui-react/dist/$1"
-    },
-    {
       "src": "/(.*)",
-      "dest": "ui-react/dist/index.html"
+      "dest": "api/index.py"
     }
-  ],
-  "outputDirectory": "ui-react/dist"
+  ]
 }
